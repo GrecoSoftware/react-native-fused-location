@@ -8,9 +8,5 @@ android/.gradle/*
 android/gradlew
 android/gradlew.bat
 android/local.properties
-<<<<<<< HEAD
 android/.project
 android/.settings
-=======
-lib
->>>>>>> MustansirZia/master
