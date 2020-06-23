@@ -1,3 +1,4 @@
+# From .gitignore.
 node_modules
 npm-debug.log
 .idea
@@ -8,9 +9,11 @@ android/.gradle/*
 android/gradlew
 android/gradlew.bat
 android/local.properties
-<<<<<<< HEAD
-android/.project
-android/.settings
-=======
-lib
->>>>>>> MustansirZia/master
+
+# Ones we don't want published to npm.
+src/*
+.vscode
+tsconfig.json
+.eslintrc.js
+.prettierrc.js
+yarn.lock

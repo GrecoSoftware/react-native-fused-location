@@ -1,22 +1,33 @@
 buildscript {
     repositories {
+        google()
         jcenter()
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:2.1.0'
+        classpath 'com.android.tools.build:gradle:3.3.2'
     }
 }
 
 apply plugin: 'com.android.library'
 
+def DEFAULT_COMPILE_SDK_VERSION          = 28
+def DEFAULT_BUILD_TOOLS_VERSION          = "28.0.3"
+def DEFAULT_TARGET_SDK_VERSION           = 28
+def DEFAULT_MIN_SDK_VERSION              = 16
+def DEFAULT_GOOGLE_PLAY_SERVICES_VERSION = "16.+"
+
+def safeExtGet(prop, fallback) {
+    rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+}
+
 android {
-    compileSdkVersion 25
-    buildToolsVersion "25.0.1"
+    compileSdkVersion safeExtGet('compileSdkVersion', DEFAULT_COMPILE_SDK_VERSION)
+    buildToolsVersion safeExtGet('buildToolsVersion', DEFAULT_BUILD_TOOLS_VERSION)
 
     defaultConfig {
-        minSdkVersion 16
-        targetSdkVersion 25
+        minSdkVersion safeExtGet('minSdkVersion', DEFAULT_MIN_SDK_VERSION)
+        targetSdkVersion safeExtGet('targetSdkVersion', DEFAULT_TARGET_SDK_VERSION)
         versionCode 1
         versionName "0.1"
     }
@@ -25,7 +36,13 @@ android {
     }
 }
 
+
+repositories {
+    google()
+    jcenter()
+}
+
 dependencies {
-    compile 'com.facebook.react:react-native:+'
-    compile 'com.google.android.gms:play-services-location:+'
+    implementation "com.facebook.react:react-native:${safeExtGet('reactNativeVersion', '+')}"
+    implementation "com.google.android.gms:play-services-location:${safeExtGet('googlePlayServicesVersion', DEFAULT_GOOGLE_PLAY_SERVICES_VERSION)}"
 }

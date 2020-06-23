@@ -2,6 +2,7 @@
 
 [![npm version](https://badge.fury.io/js/react-native-fused-location.svg)](https://badge.fury.io/js/react-native-fused-location)
 [![npm](https://img.shields.io/npm/dt/react-native-fused-location.svg)](https://www.npmjs.com/package/react-native-fused-location)
+[![Package Quality](http://npm.packagequality.com/shield/react-native-fused-location.svg)](http://packagequality.com/#?package=react-native-fused-location)
 [![MIT Licence](https://badges.frapsoft.com/os/mit/mit.svg?v=103)](https://opensource.org/licenses/mit-license.php)
 
 
@@ -50,8 +51,18 @@ include ':app'
               new MainReactPackage()
           );
         }
-
 ```
+#### Migration to AndroidX. - BREAKING CHANGE in `1.0.0`.
+• Version `1.0.0` and above of this libary now makes use of AndroidX namespace instead of the legacy android support library namespace. If your app hasn't migrated to AndroidX yet, consider doing so or instead use an older version of this library such as `0.5.1`. React Native `0.59` uses AndroidX. 
+<br />
+To enable AndroidX add these two lines in your `android/gradle.properties` file.
+```properties
+android.useAndroidX=true
+android.enableJetifier=true
+```
+If this doesn't work out. Check out [this](https://developer.android.com/jetpack/androidx/migrate) official guide from Google. 
+<br> 
+A guide more specific to React Native would be [here](https://itnext.io/react-native-how-to-handle-an-app-with-both-pre-androidx-and-androidx-dependencies-rn60-bf4df7ea0dd2). 
 
 ## Permissions.
 Add this to your `AndroidManifest.xml`:
@@ -75,12 +86,12 @@ Add this to your `AndroidManifest.xml`:
 ### API.
 | Function | Arguments | Returns | Note |
 |:---|:---:|:---:|:------|
-| `getFusedLocation` | `forceNewLocation` | `Location` | Call this once to get `Location`. Pass optional boolean `forceNewLocation` to get new location update. Otherwise return the last known location. Returns a promise.
-| `startLocationUpdates` | Nil | Nil | Call this to start receiving location updates. <br /> **<b>Note</b>: You still need to subscribe to `fusedLocation` event. <br /> So, you need to call this before you call `FusedLocation.on`.
-| `stopLocationUpdates` | Nil | Nil | Stop receiving location updates. Call this to stop listening to device's location updates.
-| `on` | `eventName, callback` | `Subscription` | Subscribe to an event. The callback with `Location` updates is eventName is `fusedLocation`. <br /> Call this after you call `startLocationUpdates`
+| `getFusedLocation` | `forceNewLocation` | `Promise[Location]` | Call this once to get `Location`. Pass optional boolean `forceNewLocation` to get new location update. Otherwise return the last known location. Returns a promise.
+| `startLocationUpdates` | Nil | `Promise[Nil]` | Call this to start receiving location updates. The function returns a promise that will resolve after the bootstrap of the Fused provider is done. <br /> **<b>Note</b>: You still need to subscribe to `fusedLocation` event. <br /> So, you need to call this before you call `FusedLocation.on`.
+| `stopLocationUpdates` | Nil | `Promise[Boolean]` | Stop receiving location updates. Call this to stop listening to device's location updates. The function returns a promise that will resolve to a boolean reflecting if the updates were indeed stoped or not (if they were already stopped beforehand).
+| `on` | `eventName, callback` | `Subscription` | Subscribe to an event. The callback is called with `Location` updates if the eventName is `fusedLocation`. <br /> Call this <b>after</b> you call `startLocationUpdates`
 | `off` | `Subscription` | Nil | Unsubscribe from the corresponding subscription.
-| `areProvidersAvailable` | Nil | Boolean | Returns true if location providers are currently available on the device. False otherwise.
+| `areProvidersAvailable` | Nil | `Promise[Boolean]` | Returns a promise that will always resolve to a boolean value. The resolved value reflects the providers' availability; true when location providers are available and false otherwise.
 
 ### Configuration.
 #### `setLocationPriority(priority)` <br />
@@ -112,7 +123,6 @@ type Location {
         longitude: Number,
         speed: Number,
         altitude: Number,
-        heading: Number,
         provider: String,
         accuracy: Number,
         bearing: Number,
@@ -166,10 +176,9 @@ async componentDidMount() {
              longitude: -2.2323,
              speed: 0,
              altitude: 0,
-             heading: 10,
              provider: 'fused',
              accuracy: 30,
-             bearing: 0,
+             bearing: 10,
              mocked: false,
              timestamp: '1513190221416'
            }
@@ -210,11 +219,13 @@ componentWillUnmount() {
 <br />
 
 ## Compatibility.
-Tested with RN versions `> 0.40.x`. For other versions I haven't had the time to test. Feel free to.
+• For versions < `1.0.0`, use with RN versions `> 0.40.x < 0.59.x`.
+<br />
+• For versions >= `1.0.0`, use with RN versions `> 0.59.x`.
 
 Tested with Android SDK version `>= 16 (Android 4.1 - Jelly Bean)`. Please feel free to test it with other versions.
 
-This repository follows [Semantic Versioning](https://semver.org/). No breaking changes will be incorporated till `v1.x.x`.
+This repository follows [Semantic Versioning](https://semver.org/). No breaking changes will be incorporated till `v2.x.x`.
 
 ## Release Notes.       
 See <a href="https://github.com/MustansirZia/react-native-fused-location/blob/master/CHANGELOG.md"> CHANGELOG.md</a>.     

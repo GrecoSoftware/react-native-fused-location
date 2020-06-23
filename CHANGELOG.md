@@ -1,5 +1,25 @@
 ## Release Notes.
 
+### 1.1.1
+° `forceNewLocation` argument made optional for `getFusedLocation` function call.
+
+### 1.0.0 - BREAKING CHANGE.
+° Support library migrated to AndroidX namespace.
+<br />
+° Added support for Typescript. ❤️
+
+### 0.5.0
+° Google play services version can now be overriden and is defaulted to `16.+`.
+° Android gradle version updated to `3.3.2`.
+• Compile SDK version defaulted to `28`.
+•  Build tools version defaulted to `28.0.3`.
+
+### 0.4.0
+° `BuildToolsVersion` and `sdkVersion` are now taken from the main android project's gradle file.
+
+### 0.2.0
+° `LocationCallback` added instead of `LocationListener` to method `getFusedLocation()` when last location returned null or forceNewLocation was set to true. This would guarantee the promise is resolved or rejected depending upon location availability.
+
 ### 0.1.0
 ° Made `areProvidersAvailable` method public under `FusedLocation.areProvidersAvailable()`.
 ° Semver for this repo started.

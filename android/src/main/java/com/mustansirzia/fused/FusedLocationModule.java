@@ -4,11 +4,11 @@ import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.location.Location;
-import android.provider.Settings;
 import android.location.LocationManager;
-import android.support.annotation.Nullable;
-import android.support.v4.app.ActivityCompat;
-import android.support.annotation.NonNull;
+import android.provider.Settings;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.core.app.ActivityCompat;
 import android.util.Log;
 
 import com.facebook.react.bridge.Promise;
@@ -22,9 +22,15 @@ import com.facebook.react.modules.core.DeviceEventManagerModule;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.common.api.Status;
+import com.google.android.gms.location.LocationAvailability;
+import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationAvailability;
@@ -38,11 +44,14 @@ import com.google.android.gms.common.api.Status;
 
 public class FusedLocationModule extends ReactContextBaseJavaModule {
 
-    private static final String TAG = "REACT_NATIVE_FUSED_LOCATION";
+    private static final String TAG = "FUSED_LOCATION";
     private final int PLAY_SERVICES_RESOLUTION_REQUEST = 2404;
     private final String NATIVE_EVENT = "fusedLocation";
     private final String NATIVE_ERROR = "fusedLocationError";
     private final String NATIVE_STATUS = "fusedLocationStatus";
+    private final String ERROR_PLAY_SERVICES_NOT_FOUND = "Play services not found.";
+    private final String ERROR_UNAUTHORIZED = "Appropriate permissions not given.";
+    private final String ERROR_NO_LOCATION_PROVIDER = "No location provider found.";
     private int mLocationInterval = 15000;
     private int mLocationPriority = LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY;
     private int mLocationFastestInterval = 10000;
@@ -93,85 +102,106 @@ public class FusedLocationModule extends ReactContextBaseJavaModule {
         this.mSmallestDisplacement = mSmallestDisplacement;
     }
 
+    @SuppressWarnings("All")
     @ReactMethod
-    public void getFusedLocation( boolean forceNewLocation, final Promise promise) {
+    public void getFusedLocation(boolean forceNewLocation, final Promise promise) {
         try {
             if (!areProvidersAvailable()) {
-                promise.reject(TAG, "No location provider found.");
+                promise.reject(TAG, ERROR_NO_LOCATION_PROVIDER);
                 return;
             }
             if (!checkForPlayServices()) {
-                promise.reject(TAG, "Install Google Play Services First and Try Again.");
+                promise.reject(TAG, ERROR_PLAY_SERVICES_NOT_FOUND);
                 return;
             }
-            if (ActivityCompat.checkSelfPermission(getReactApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getReactApplicationContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                promise.reject(TAG, "Appropriate permissions not given.");
+            if (ActivityCompat.checkSelfPermission(getReactApplicationContext(),
+                    Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                    && ActivityCompat.checkSelfPermission(getReactApplicationContext(),
+                            Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                promise.reject(TAG, ERROR_UNAUTHORIZED);
                 return;
             }
             final GoogleApiClient googleApiClient;
             LocationRequest request = buildLR();
-            googleApiClient = new GoogleApiClient.Builder(getReactApplicationContext())
-                    .addApi(LocationServices.API)
+            googleApiClient = new GoogleApiClient.Builder(getReactApplicationContext()).addApi(LocationServices.API)
                     .build();
             googleApiClient.blockingConnect();
             final Location location;
-            if(!forceNewLocation) {
+            if (!forceNewLocation) {
                 location = LocationServices.FusedLocationApi.getLastLocation(googleApiClient);
-            }
-            else {
+            } else {
                 location = null;
             }
             if (location == null) {
-                LocationServices.FusedLocationApi.requestLocationUpdates(googleApiClient, request, new LocationListener() {
-                    @Override
-                    public void onLocationChanged(Location l) {
-                        LocationServices.FusedLocationApi.removeLocationUpdates(googleApiClient, this);
-                        googleApiClient.disconnect();
-                        promise.resolve(convertLocationToJSON(l));
-                    }
-                });
-            } else {
-                promise.resolve(convertLocationToJSON(location));
-                googleApiClient.disconnect();
+                LocationServices.FusedLocationApi.requestLocationUpdates(googleApiClient, request,
+                        new LocationCallback() {
+                            @Override
+                            public void onLocationResult(LocationResult locationResult) {
+                                super.onLocationResult(locationResult);
+                                promise.resolve(convertLocationToJSON(locationResult.getLastLocation()));
+                            }
+
+                            @Override
+                            public void onLocationAvailability(LocationAvailability locationAvailability) {
+                                super.onLocationAvailability(locationAvailability);
+                                LocationServices.FusedLocationApi.removeLocationUpdates(googleApiClient, this);
+                                googleApiClient.disconnect();
+                                if (!locationAvailability.isLocationAvailable()) {
+                                    promise.reject(TAG,
+                                            "Location not available. Does your phone have GPS turned on and internet connectivity?");
+                                }
+                            }
+                        }, null);
+                return;
             }
+            promise.resolve(convertLocationToJSON(location));
+            googleApiClient.disconnect();
         } catch (Exception ex) {
             Log.e(TAG, "Native Location Module ERR - " + ex.toString());
             promise.reject(TAG, ex.toString());
         }
     }
 
+    @SuppressWarnings("All")
     @ReactMethod
-    public void startLocationUpdates() {
+    public void startLocationUpdates(final Promise promise) {
         try {
             if (!checkForPlayServices()) {
                 WritableMap params = new WritableNativeMap();
-                params.putString("error", "Play services not found.");
+                params.putString("error", ERROR_PLAY_SERVICES_NOT_FOUND);
                 sendEvent(getReactApplicationContext(), NATIVE_ERROR, params);
+                promise.reject(TAG, ERROR_PLAY_SERVICES_NOT_FOUND);
                 return;
             }
-            if (ActivityCompat.checkSelfPermission(getReactApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getReactApplicationContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            if (ActivityCompat.checkSelfPermission(getReactApplicationContext(),
+                    Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                    && ActivityCompat.checkSelfPermission(getReactApplicationContext(),
+                            Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                 WritableMap params = new WritableNativeMap();
-                params.putString("error", "Appropriate permissions not given.");
+                params.putString("error", ERROR_UNAUTHORIZED);
                 sendEvent(getReactApplicationContext(), NATIVE_ERROR, params);
+                promise.reject(TAG, ERROR_UNAUTHORIZED);
                 return;
             }
             if (!areProvidersAvailable()) {
                 WritableMap params = new WritableNativeMap();
-                params.putString("error", "No location provider found.");
+                params.putString("error", ERROR_NO_LOCATION_PROVIDER);
                 sendEvent(getReactApplicationContext(), NATIVE_ERROR, params);
-                // Allow the App to still register the location updates so that it can send new locations if the user turns on the GPS through the notification bar
+                // Allow the App to still register the location updates so that it can send new
+                // locations if the user turns on the GPS through the notification bar
+                // promise.reject(TAG, ERROR_NO_LOCATION_PROVIDER);
                 // return;
             }
             LocationRequest request = buildLR();
-            Log.e("request", request.getPriority() + "");
-            mGoogleApiClient = new GoogleApiClient.Builder(getReactApplicationContext())
-                    .addApi(LocationServices.API)
+            Log.d("request", request.getPriority() + "");
+            mGoogleApiClient = new GoogleApiClient.Builder(getReactApplicationContext()).addApi(LocationServices.API)
                     .build();
             mGoogleApiClient.blockingConnect();
             mLocationCallback = new LocationCallback() {
                 @Override
                 public void onLocationResult(LocationResult result) {
-                    sendEvent(getReactApplicationContext(), NATIVE_EVENT, convertLocationToJSON(result.getLastLocation()));
+                    sendEvent(getReactApplicationContext(), NATIVE_EVENT,
+                            convertLocationToJSON(result.getLastLocation()));
                 }
 
                 @Override
@@ -181,40 +211,53 @@ public class FusedLocationModule extends ReactContextBaseJavaModule {
                     sendEvent(getReactApplicationContext(), NATIVE_STATUS, availability);
                 }
             };
-            LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, request, mLocationCallback, null);
+            LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, request, mLocationCallback,
+                    null);
+            promise.resolve(null);
         } catch (Exception ex) {
             Log.e(TAG, "Native Location Module ERR - " + ex.toString());
             WritableMap params = new WritableNativeMap();
             params.putString("error", "Native Location Module ERR - " + ex.toString());
             sendEvent(getReactApplicationContext(), NATIVE_ERROR, params);
+            promise.reject(TAG, ex);
         }
     }
 
     @ReactMethod
     public void stopLocationUpdates() {
         if (mGoogleApiClient != null && mLocationCallback != null && mGoogleApiClient.isConnected()) {
-            PendingResult<Status> result = LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, mLocationCallback);
+            PendingResult<Status> result = LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient,
+                    mLocationCallback);
             result.setResultCallback(new ResultCallback<Status>() {
                 @Override
                 public void onResult(@NonNull Status status) {
                     mGoogleApiClient.disconnect();
                     if (!status.isSuccess()) {
                         Log.e(TAG, "Could not remove location updates.");
+                        promise.reject(TAG, String.valueOf(status.getStatusCode()));
                     } else {
-                        Log.i(TAG, "Location request removed successfully");
+                        promise.resolve(true);
                     }
+
                 }
             });
+        } else {
+            promise.resolve(false);
         }
     }
 
     @ReactMethod
-    public boolean areProvidersAvailable() {
-        LocationManager lm = (LocationManager)getReactApplicationContext().getSystemService(Context.LOCATION_SERVICE);
+    public void areProvidersAvailable(final Promise promise) {
+        promise.resolve(areProvidersAvailable());
+    }
+
+    private boolean areProvidersAvailable() {
+        LocationManager lm = (LocationManager) getReactApplicationContext().getSystemService(Context.LOCATION_SERVICE);
         boolean gps_enabled = false;
         try {
-            gps_enabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER) || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
-        } catch(Exception ex) {
+            gps_enabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER)
+                    || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+        } catch (Exception ex) {
             Log.e(TAG, ex.toString());
         }
         return gps_enabled;
@@ -224,12 +267,11 @@ public class FusedLocationModule extends ReactContextBaseJavaModule {
     // 22493465/check-if-correct-google-play-service-available-unfortunately-application-has-s
     private boolean checkForPlayServices() {
         GoogleApiAvailability googleApiAvailability = GoogleApiAvailability.getInstance();
-        int resultCode = googleApiAvailability
-                .isGooglePlayServicesAvailable(getReactApplicationContext());
+        int resultCode = googleApiAvailability.isGooglePlayServicesAvailable(getReactApplicationContext());
         if (resultCode != ConnectionResult.SUCCESS) {
             if (googleApiAvailability.isUserResolvableError(resultCode)) {
-                googleApiAvailability.getErrorDialog(getCurrentActivity(), resultCode,
-                        PLAY_SERVICES_RESOLUTION_REQUEST).show();
+                googleApiAvailability.getErrorDialog(getCurrentActivity(), resultCode, PLAY_SERVICES_RESOLUTION_REQUEST)
+                        .show();
             }
             return false;
         }
@@ -246,11 +288,13 @@ public class FusedLocationModule extends ReactContextBaseJavaModule {
         params.putString("provider", l.getProvider());
         params.putDouble("speed", l.getSpeed());
         params.putString("timestamp", Long.toString(l.getTime()));
-        boolean isMock = false;
+        boolean isMock;
         if (android.os.Build.VERSION.SDK_INT >= 18) {
             isMock = l.isFromMockProvider();
         } else {
-            isMock = !Settings.Secure.getString(getReactApplicationContext().getContentResolver(), Settings.Secure.ALLOW_MOCK_LOCATION).equals("0");
+            isMock = !Settings.Secure
+                    .getString(getReactApplicationContext().getContentResolver(), Settings.Secure.ALLOW_MOCK_LOCATION)
+                    .equals("0");
         }
         params.putBoolean("mocked", isMock);
         return params;
@@ -266,15 +310,13 @@ public class FusedLocationModule extends ReactContextBaseJavaModule {
     }
 
     /*
-  * Internal function for communicating with JS
-  */
+     * Internal function for communicating with JS
+     */
     private void sendEvent(ReactContext reactContext, String eventName, @Nullable WritableMap params) {
         if (reactContext.hasActiveCatalystInstance()) {
-            reactContext
-                    .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
-                    .emit(eventName, params);
+            reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class).emit(eventName, params);
         } else {
-            Log.i(TAG, "Waiting for CatalystInstance...");
+            Log.d(TAG, "Waiting for Catalyst Instance...");
         }
     }
 }
