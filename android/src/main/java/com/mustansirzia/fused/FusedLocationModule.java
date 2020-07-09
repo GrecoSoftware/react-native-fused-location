@@ -224,7 +224,7 @@ public class FusedLocationModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void stopLocationUpdates() {
+    public void stopLocationUpdates(final Promise promise) {
         if (mGoogleApiClient != null && mLocationCallback != null && mGoogleApiClient.isConnected()) {
             PendingResult<Status> result = LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient,
                     mLocationCallback);
